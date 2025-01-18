@@ -2,6 +2,8 @@ import { ClientOptions, Cloudflare } from 'cloudflare';
 import { AAAARecord, ARecord } from 'cloudflare/src/resources/dns/records.js';
 type AddressableRecord = AAAARecord | ARecord;
 
+const autoIPkeyword = 'auto';
+
 class HttpError extends Error {
 	constructor(
 		public statusCode: number,
@@ -44,6 +46,17 @@ function constructDNSRecord(request: Request): AddressableRecord {
 
 	if (hostname === null || hostname === undefined) {
 		throw new HttpError(422, 'The "hostname" parameter is required and cannot be empty.');
+	}
+
+	if (ip === autoIPkeyword) {
+		ip = request.headers.get('CF-Connecting-IP');
+		console.log(`The "ip" parameter was specified as ${autoIPkeyword}. Using remote IP address ${ip}.`);
+	}
+
+	const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+	const ipv6Pattern = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
+	if (!ipv4Pattern.test(ip) && !ipv6Pattern.test(ip)) {
+		throw new HttpError(422, 'The IP address must be a valid IPv4 or IPv6 address.');
 	}
 
 	return {
